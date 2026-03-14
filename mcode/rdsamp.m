@@ -45,9 +45,9 @@ function varargout=rdsamp(varargin)
 %
 %
 % rawUnits
-%       A 1x1 integer (default: 0). Returns tm and signal as vectors
+%       A 1x1 integer (default: 1). Returns tm and signal as vectors
 %       according to the following values:
-%               rawUnits=0 - Uses Java Native Interface to directly fetch  data, returning signal in physical units with double precision.
+%               rawUnits=0 - Uses Java Native Interface to directly fetch  data, returning signal in physical units with double precision. Requires JVM 7.
 %               rawUnits=1 -returns tm ( millisecond precision only! ) and signal in physical units with 64 bit (double) floating point precision
 %               rawUnits=2 -returns tm ( millisecond precision only! ) and signal in physical units with 32 bit (single) floating point  precision
 %               rawUnits=3 -returns both tm and signal as 16 bit integers (short). Use Fs to convert tm to seconds.
@@ -93,7 +93,7 @@ N=[];
 N0=0;
 ListCapacity=[]; %Use to pre-allocate space for reading
 siginfo=[];
-rawUnits=0;
+rawUnits=1;
 Fs=[];
 tm=[];
 signal=[];

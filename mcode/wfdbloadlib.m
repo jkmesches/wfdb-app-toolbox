@@ -160,6 +160,10 @@ if(isempty(config))
         
         %Define WFDB Environment variables
         if(isempty(WFDB_PATH))
+            %Check if user has set the WFDB environment variable
+            WFDB_PATH=getenv('WFDB');
+        end
+        if(isempty(WFDB_PATH))
             tmpCache=[config.MATLAB_PATH '..' filesep 'database' filesep];
             WFDB_PATH=['. ' tmpCache ' http://physionet.org/physiobank/database/'];
         end

@@ -38,7 +38,12 @@ end
 %Set system-wide parameters defined by wfdbloadlib.m
 javaWfdbExec.setInitialWaitTime(config.NETWORK_WAIT_TIME);
 javaWfdbExec.setLogLevel(config.DEBUG_LEVEL);
-javaWfdbExec.setWFDB_PATH(config.WFDB_PATH);
+wfdb_env=getenv('WFDB');
+if(~isempty(wfdb_env))
+    javaWfdbExec.setWFDB_PATH(wfdb_env);
+else
+    javaWfdbExec.setWFDB_PATH(config.WFDB_PATH);
+end
 javaWfdbExec.setWFDBCAL(config.WFDBCAL);
 
 for n=1:nargout
