@@ -47,7 +47,7 @@ function varargout=rdsamp(varargin)
 % rawUnits
 %       A 1x1 integer (default: 1). Returns tm and signal as vectors
 %       according to the following values:
-%               rawUnits=0 - Uses Java Native Interface to directly fetch  data, returning signal in physical units with double precision. Requires JVM 7.
+%               rawUnits=0 (default) - Uses Java Native Interface to directly fetch data, returning signal in physical units with double precision.
 %               rawUnits=1 -returns tm ( millisecond precision only! ) and signal in physical units with 64 bit (double) floating point precision
 %               rawUnits=2 -returns tm ( millisecond precision only! ) and signal in physical units with 32 bit (single) floating point  precision
 %               rawUnits=3 -returns both tm and signal as 16 bit integers (short). Use Fs to convert tm to seconds.
@@ -93,7 +93,7 @@ N=[];
 N0=0;
 ListCapacity=[]; %Use to pre-allocate space for reading
 siginfo=[];
-rawUnits=1;
+rawUnits=0;
 Fs=[];
 tm=[];
 signal=[];
@@ -108,6 +108,26 @@ end
 wfdbdownload(recordName);
 javaWfdbRdsamp=[];
 if(isempty(javaWfdbRdsamp) && (rawUnits ==0))
+    % The JNI WFDB library reads the WFDB path via C getenv() at load time.
+    % MATLAB's setenv() cannot update this for the running JVM. Copy cached
+    % files into the current directory so JNI finds them via '.' in the
+    % default WFDB path.
+    ind=strfind(recordName,'/');
+    if(~isempty(ind) && config.CACHE)
+        recDir=recordName(1:ind(end)-1);
+        localDir=fullfile(pwd,recDir);
+        if(~exist(localDir,'dir'))
+            mkdir(localDir);
+        end
+        cachedFiles=dir([config.CACHE_DEST recordName '.*']);
+        for cf=1:length(cachedFiles)
+            src=fullfile(cachedFiles(cf).folder,cachedFiles(cf).name);
+            dst=fullfile(localDir,cachedFiles(cf).name);
+            if(~exist(dst,'file'))
+                copyfile(src,dst);
+            end
+        end
+    end
     javaWfdbRdsamp=javaObject('org.physionet.wfdb.jni.Rdsamp');
 end
 

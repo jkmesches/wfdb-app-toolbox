@@ -123,7 +123,7 @@ for n=1:L-1
         RecordName=C{2}{:};
     elseif(~isempty(strfind(str,'Starting time:')))
         ind1=strfind(str,':');
-        StartTime =str(ind1+2:end);
+        StartTime =str(ind1(1)+2:end);
     elseif(~isempty(strfind(str,'Length:')))
         %Should happen only once
         ind1=strfind(str,'(');

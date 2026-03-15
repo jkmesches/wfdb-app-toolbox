@@ -60,11 +60,12 @@ end
 
 [~,config]=wfdbloadlib;
 
-%Check if file exist  already, if exists in CACHE, exit
-file_info=dir([config.CACHE_DEST recordName '.*']);
+%Check if both .hea and .dat exist in CACHE before skipping download
+hea_exists=exist([config.CACHE_DEST recordName '.hea'],'file');
+dat_exists=exist([config.CACHE_DEST recordName '.dat'],'file');
 ind=findstr(recordName,'/'); %If empty, not in PhysioBank DB format
 
-if(~isempty(file_info) || isempty(ind) || (config.CACHE==0))
+if((hea_exists && dat_exists) || isempty(ind) || (config.CACHE==0))
     success=-1;
 else
     

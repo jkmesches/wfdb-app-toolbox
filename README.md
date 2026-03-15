@@ -1,6 +1,29 @@
-<p align="center" >
-  <img src="http://physionet.org/physiotools/matlab/wfdb-app-matlab/wfdbrecordviewerTB.png" alt="wfdbRecordViewer" title="wfdbRecordViewer" />
-</p>
+## About this fork
+
+Patched version of the WFDB App Toolbox (0.10.0). The upstream toolbox
+has not been updated since 2014 and is broken on modern MATLAB due to
+JVM incompatibilities, PhysioNet's HTTPS migration, and several parsing
+bugs. This fork fixes those issues and rebuilds the native libraries
+with SSL support for all platforms.
+
+See [upstream issue #188](https://github.com/ikarosilva/wfdb-app-toolbox/issues/188)
+for the original bug report.
+
+### What's fixed
+
+The main issues were that `rdsamp` crashed on any JVM newer than 7,
+`setenv('WFDB', ...)` was silently ignored for local datasets, and the
+bundled `libcurl` couldn't follow HTTPS redirects. On top of that,
+`wfdbdownload` would cache HTTP error pages as valid signal data,
+`wfdbdesc` crashed on any record with colons in the timestamp,
+`ecgpuwave` interpreted sample numbers as seconds, and `msentropy`
+crashed parsing its own output.
+
+All of these are fixed. The native libraries have been rebuilt with
+SSL-capable `libcurl` on Linux, macOS (ARM64), and Windows. The Java
+jar is compiled for JVM 8+.
+
+Licensed under the same [GPL v3](LICENSE) as the original.
 
 ## Introduction
 The WFDB Toolbox for MATLAB and Octave is a set of Java, GUI, and m-code wrapper functions,
@@ -20,31 +43,62 @@ The Toolbox is open-source (distributed under the GPL). The toolbox includes a G
 for facilitating the browsing, exploration, and analysis of WFBD records stored locally on the users machine, 
 or remotely in PhysioNet's [databases](http://physionet.org/physiobank/database/DBS).
 
-## Forum
-
-A community discussion group is available at:
-http://groups.google.com/forum/#!forum/wfdb-app-toolbox
-
 ## Available Databases
 
 For a list of available databases accessible through the WFDB Toolbox, see:
 
 http://physionet.org/physiobank/database/DBS
 
-## Installing from PhysioNet
+## Installing this fork
 
-To check out and install from PhysioNet using MATLAB, run the following commands:
+Download the latest release zip from the
+[Releases](https://github.com/jkmesches/wfdb-app-toolbox/releases) page,
+extract it, then in MATLAB:
 
-```
+```matlab
+% Remove any existing WFDB toolbox from the path
 [old_path]=which('rdsamp');if(~isempty(old_path)) rmpath(old_path(1:end-8)); end
-wfdb_url='https://physionet.org/physiotools/matlab/wfdb-app-matlab/wfdb-app-toolbox-0-10-0.zip';
-[filestr,status] = urlwrite(wfdb_url,'wfdb-app-toolbox-0-10-0.zip');
-unzip('wfdb-app-toolbox-0-10-0.zip');
-cd mcode
-addpath(pwd);savepath
 
+% Add the patched toolbox
+addpath('/path/to/extracted/mcode'); savepath;
+
+% Test it
+[sig, Fs] = rdsamp('mitdb/100', [], 1000);
+plot(sig(:,1));
 ```
-## Checking out and installing from the trunk
+
+To use locally downloaded datasets (e.g. PTB-XL):
+
+```matlab
+setenv('WFDB', '/path/to/ptb-xl-dataset .');
+[sig, Fs] = rdsamp('records500/00000/00001_hr');
+```
+
+### Installing the original (unpatched) from PhysioNet
+
+The upstream version is available at:
+https://physionet.org/physiotools/matlab/wfdb-app-matlab/
+
+Note: the upstream version has known issues with MATLAB R2020+ and newer
+PhysioNet HTTPS endpoints. See issue
+[#188](https://github.com/ikarosilva/wfdb-app-toolbox/issues/188).
+
+## Known issues
+
+These are inherited from upstream and not fully fixed here:
+
+- `bxb` / `mxm` — native binaries silently produce no output on some
+  records (especially `mat2wfdb`-generated ones). This fork adds a clear
+  error instead of crashing.
+- `edr` — one struct indexing bug is fixed, but a second indexing error
+  in the gain/QRS boundary code remains.
+- `corrint` — the native binary was never shipped upstream. The MATLAB
+  wrapper exists but has nothing to call.
+
+Tested on MATLAB R2025b (Linux x86_64): 42/52 pass, 3 fail (above),
+7 skip (GUIs and databases needing specific access).
+
+## Building from source
 
 Building the toolbox requires:
 - The GNU C compiler (GCC)

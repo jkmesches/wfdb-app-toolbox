@@ -11,9 +11,9 @@
 		<delete dir="${build.dir}"/>
 		<mkdir dir="${build.dir}"/>
 	    <mkdir dir="${classes.dir}"/>
-	    <javac srcdir="${src.dir}" destdir="${classes.dir}"	
-	    	includeantruntime="yes"	target="1.7" 
-	    	source="1.7" />
+	    <javac srcdir="${src.dir}" destdir="${classes.dir}"
+	    	includeantruntime="yes"	target="1.8"
+	    	source="1.8" />
 	</target>
 	<target name="compile8">
 	 	 	<delete dir="${build.dir}"/>

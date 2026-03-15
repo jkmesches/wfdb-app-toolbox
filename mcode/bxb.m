@@ -129,6 +129,9 @@ if(~isempty(recName))
 end
 
 if(nargout>0)
+    if(~exist(reportFile,'file'))
+        error('bxb failed to create report file. Check that the record and annotations are valid.');
+    end
     varargout{1}=bxbReader(reportFile);
 end
 

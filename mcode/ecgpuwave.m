@@ -123,11 +123,19 @@ wfdb_argument={'-r',recordName,'-a',annFileName};
 
 if(~isempty(startTime))
     wfdb_argument{end+1}='-f';
-    wfdb_argument{end+1}=num2str(startTime-1);
+    if(ischar(startTime))
+        wfdb_argument{end+1}=startTime;
+    else
+        wfdb_argument{end+1}=['s' num2str(startTime-1)];
+    end
 end
 if(~isempty(stopTime))
     wfdb_argument{end+1}='-t';
-    wfdb_argument{end+1}=num2str(stopTime-1);
+    if(ischar(stopTime))
+        wfdb_argument{end+1}=stopTime;
+    else
+        wfdb_argument{end+1}=['s' num2str(stopTime-1)];
+    end
 end
 
 if(~isempty(signalList))

@@ -1,0 +1,147 @@
+name: Build release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-natives:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            host: linux
+            libcurl_name: libcurl.so.4
+          - os: macos-14
+            host: macosx
+            libcurl_name: libcurl.4.dylib
+          - os: windows-2022
+            host: windows
+            libcurl_name: libcurl-4.dll
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies (Linux)
+        if: matrix.host == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev gfortran
+
+      - name: Install dependencies (macOS)
+        if: matrix.host == 'macosx'
+        run: brew install openssl gfortran coreutils automake libtool
+
+      - name: Install dependencies (Windows)
+        if: matrix.host == 'windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          install: >-
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-gcc-fortran
+            mingw-w64-x86_64-openssl
+            mingw-w64-x86_64-curl
+            make wget autoconf automake libtool
+
+      - name: Build native libraries (Linux)
+        if: matrix.host == 'linux'
+        working-directory: mcode/nativelibs
+        run: |
+          sed -i 's/--without-ssl/--with-ssl/' Makefile
+          make install host=linux nocheck=1 nojavacheck=1
+          make installclean host=linux
+
+      - name: Build native libraries (macOS)
+        if: matrix.host == 'macosx'
+        working-directory: mcode/nativelibs
+        run: |
+          ln -sf "$(brew --prefix gcc)/bin/gfortran-"* /usr/local/bin/gfortran
+          ln -sf "$(brew --prefix libtool)/bin/glibtoolize" /usr/local/bin/libtoolize
+          sed -i '' 's/--without-ssl/--with-ssl/' Makefile
+          export PKG_CONFIG_PATH="$(brew --prefix openssl)/lib/pkgconfig:$PKG_CONFIG_PATH"
+          export LDFLAGS="-L$(brew --prefix openssl)/lib"
+          export CPPFLAGS="-I$(brew --prefix openssl)/include"
+          export LIBRARY_PATH="$(brew --prefix openssl)/lib:${LIBRARY_PATH:-}"
+          make install host=macosx nocheck=1 nojavacheck=1 \
+            extra_ldflags="-std=gnu89 -Wno-error=implicit-function-declaration" \
+            extra_curl_configure_args="--with-ssl=$(brew --prefix openssl) --without-nghttp2 --without-libidn2 --without-brotli --without-zstd --without-libpsl"
+          make installclean host=macosx
+
+      - name: Build native libraries (Windows)
+        if: matrix.host == 'windows'
+        shell: msys2 {0}
+        working-directory: mcode/nativelibs
+        run: |
+          sed -i 's/--without-ssl/--with-ssl/' Makefile
+          # Skip building curl from source — use MSYS2's pre-built curl (has SSL)
+          mkdir -p windows/build/bin windows/bin
+          cp "$(which curl-config)" windows/build/bin/
+          cp /mingw64/bin/libcurl-4.dll windows/bin/
+          touch windows/build/curl.isconfig windows/build/curl.isbuilt
+          make install host=windows nocheck=1 nojavacheck=1 \
+            extra_ldflags="-static-libgcc -static-libgfortran -std=gnu89"
+          make installclean host=windows
+
+      - name: Upload native libs
+        uses: actions/upload-artifact@v4
+        with:
+          name: nativelibs-${{ matrix.host }}
+          path: mcode/nativelibs/${{ matrix.host }}/
+
+  package:
+    needs: build-natives
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Java jar
+        run: ant -f jarbuild.xml jar7
+
+      - name: Download all native lib artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Assemble release
+        run: |
+          RELEASE="wfdb-app-toolbox-0-10-0-patched"
+          mkdir -p "$RELEASE/mcode/nativelibs"
+          cp mcode/*.m "$RELEASE/mcode/"
+          cp mcode/*.jar "$RELEASE/mcode/" 2>/dev/null || true
+          cp -r mcode/nativelibs/custom "$RELEASE/mcode/nativelibs/"
+          for platform in linux macosx windows; do
+            cp -r "artifacts/nativelibs-$platform" "$RELEASE/mcode/nativelibs/$platform"
+          done
+          chmod +x "$RELEASE/mcode/nativelibs/linux/bin/"* "$RELEASE/mcode/nativelibs/macosx/bin/"* 2>/dev/null || true
+          zip -qr "${RELEASE}.zip" "$RELEASE/"
+          echo "RELEASE_ZIP=${RELEASE}.zip" >> $GITHUB_ENV
+
+      - name: Create GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.RELEASE_ZIP }}
+          body: |
+            Patched WFDB App Toolbox 0.10.0 with fixes for modern MATLAB (R2020+).
+
+            Changes:
+            - rdsamp uses JNI (rawUnits=0) by default with streaming workaround
+            - setenv('WFDB', ...) now works for custom search paths
+            - Cache no longer saves corrupt HTML error pages as signal data
+            - wfdbdesc, ecgpuwave, msentropy, edr, bxb parsing bugs fixed
+            - Native binaries rebuilt with SSL-capable libcurl (all platforms)
+            - Java jar compiled for JVM 8+
+
+            Installation: extract the zip, then in MATLAB:
+              addpath('<extracted>/mcode'); savepath;
+
+            See README for known issues and full test results.
+
+      - name: Upload zip artifact (for non-tag builds)
+        if: "!startsWith(github.ref, 'refs/tags/')"
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-zip
+          path: ${{ env.RELEASE_ZIP }}

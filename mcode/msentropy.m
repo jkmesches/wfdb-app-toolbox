@@ -175,10 +175,12 @@ M=M-4;
 scale=zeros(M,1)+NaN;
 y=zeros(M,1)+NaN;
 for m=1:M
-    str=out{m};
-    sep=regexp(str,'\s');
-    scale(m)=str2num(str(1:sep));
-    y(m)=str2num(str(sep(1):sep(2)));
+    str=strtrim(out{m});
+    vals=sscanf(str,'%f %f');
+    if length(vals)>=2
+        scale(m)=vals(1);
+        y(m)=vals(2);
+    end
 end
 
 for n=1:nargout

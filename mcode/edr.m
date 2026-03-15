@@ -138,7 +138,7 @@ elseif data_type==1 %wfdb record
     end
     % read the header
     siginfo=wfdbdesc(signal);
-    siginfo=siginfo(:,channel);
+    siginfo=siginfo(channel);
     gainstring=siginfo.Gain;
     sp=strfind(gainstring,' ');
     try
