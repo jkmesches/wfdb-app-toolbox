@@ -60,11 +60,15 @@ end
 
 [~,config]=wfdbloadlib;
 
-%Check if file exist  already, if exists in CACHE, exit
-file_info=dir([config.CACHE_DEST recordName '.*']);
+%Check if both .hea and .dat exist in CACHE before skipping download.
+%The original wildcard check (dir(...'.*')) would match if only one file
+%was present (e.g. .dat without .hea), permanently preventing the missing
+%file from being re-downloaded.
+hea_exists=exist([config.CACHE_DEST recordName '.hea'],'file');
+dat_exists=exist([config.CACHE_DEST recordName '.dat'],'file');
 ind=findstr(recordName,'/'); %If empty, not in PhysioBank DB format
 
-if(~isempty(file_info) || isempty(ind) || (config.CACHE==0))
+if((hea_exists && dat_exists) || isempty(ind) || (config.CACHE==0))
     success=-1;
 else
     
@@ -81,15 +85,26 @@ else
         
         %File does not exist on cache, attempt to download from server
         for m=1:M
+            dest_file=[config.CACHE_DEST recordName wfdb_extensions{m}];
             try
             [furl] = urlwrite([config.CACHE_SOURCE recordName wfdb_extensions{m}],...
-                [config.CACHE_DEST recordName wfdb_extensions{m}],'Timeout',timeout);
+                dest_file,'Timeout',timeout);
             if(~isempty(furl))
-                files_saved{end+1}=furl;
-                warning(['Downloaded WFDB cache file: ' furl]);
+                %Verify we didn't download an HTML error page.
+                %PhysioNet returns HTML for 404s and HTTPS redirects,
+                %which urlwrite saves as if it were valid data.
+                fid=fopen(dest_file,'r');
+                header=fread(fid,5,'*char')';
+                fclose(fid);
+                if(strncmpi(header,'<!DOC',5) || strncmpi(header,'<html',5))
+                    delete(dest_file);
+                else
+                    files_saved{end+1}=furl;
+                    warning(['Downloaded WFDB cache file: ' furl]);
+                end
             end
             catch
-               %Do nothing, because some extensions will not exist 
+               %Do nothing, because some extensions will not exist
             end
         end
         success=length(files_saved);
